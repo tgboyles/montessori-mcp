@@ -6,15 +6,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { TCClient } from "./tc-client.js";
 
-const email = process.env.TC_EMAIL ?? "";
-const password = process.env.TC_PASSWORD ?? "";
-const skip = !email || !password;
+const skip = !process.env.TC_EMAIL || !process.env.TC_PASSWORD;
 
 describe.skipIf(skip)("TCClient (live TC API)", () => {
   let tc: TCClient;
 
   beforeAll(() => {
-    tc = new TCClient(email, password);
+    tc = new TCClient(process.env.TC_EMAIL!, process.env.TC_PASSWORD!);
   });
 
   it("authenticates and returns a valid api_token", async () => {

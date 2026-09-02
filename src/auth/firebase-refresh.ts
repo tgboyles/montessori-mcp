@@ -1,5 +1,4 @@
-// Firebase public client-side API key — not a secret.
-const FIREBASE_API_KEY = "AIzaSyCt9hn6iIod1TQ_MYoRnNoROY4kn-fhxoc";
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY ?? "AIzaSyCt9hn6iIod1TQ_MYoRnNoROY4kn-fhxoc";
 const TOKEN_ENDPOINT = `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`;
 
 interface TokenResponse {

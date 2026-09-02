@@ -1,6 +1,5 @@
 // Firebase project: seabirdmain
-// Public client-side constants (embedded in the Expo JS bundle).
-const FIREBASE_API_KEY = "AIzaSyCt9hn6iIod1TQ_MYoRnNoROY4kn-fhxoc";
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY ?? "AIzaSyCt9hn6iIod1TQ_MYoRnNoROY4kn-fhxoc";
 const FIREBASE_RTDB_URL = "https://seabirdmain-default-rtdb.firebaseio.com";
 const FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword";
 

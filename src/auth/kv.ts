@@ -32,8 +32,14 @@ let memory: MemoryStore | null = null;
 
 function getStore(): Redis | MemoryStore {
   if (process.env.REDIS_URL) {
-    if (!redis) redis = new Redis(process.env.REDIS_URL);
-    return redis;
+    if (!redis) {
+      redis = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 3 });
+      redis.on("error", (err: Error) => {
+        process.stderr.write(`Redis error (falling back to in-memory): ${err.message}\n`);
+        redis = null;
+      });
+    }
+    if (redis) return redis;
   }
   if (!memory) memory = new MemoryStore();
   return memory;

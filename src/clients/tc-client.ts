@@ -95,8 +95,12 @@ export class TCClient {
     return data;
   }
 
-  private async request<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+  private async ensureAuth(): Promise<void> {
     if (!this.apiToken) await this.authenticate();
+  }
+
+  private async request<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+    await this.ensureAuth();
     const url = new URL(`${TC_BASE}${path}`);
     for (const [k, v] of Object.entries(params)) {
       url.searchParams.set(k, String(v));
@@ -135,14 +139,17 @@ export class TCClient {
   }
 
   async getChildren(): Promise<TCChild[]> {
+    await this.ensureAuth();
     return this.request("/children.json", this.schoolParam());
   }
 
   async getClassrooms(): Promise<TCClassroom[]> {
+    await this.ensureAuth();
     return this.request("/classrooms.json", this.schoolParam());
   }
 
   async getLessons(childId: number, params: { date_start?: string; date_end?: string } = {}): Promise<TCLesson[]> {
+    await this.ensureAuth();
     return this.request("/lessons.json", {
       ...this.schoolParam(),
       child_id: childId,
@@ -151,6 +158,7 @@ export class TCClient {
   }
 
   async getObservations(childId: number, params: { date_start?: string; date_end?: string } = {}): Promise<TCObservation[]> {
+    await this.ensureAuth();
     return this.request("/observations.json", {
       ...this.schoolParam(),
       child_id: childId,
@@ -159,28 +167,27 @@ export class TCClient {
   }
 
   async getEvents(params: { start_date?: string; end_date?: string } = {}): Promise<TCEvent[]> {
-    return this.request("/events.json", {
-      ...this.schoolParam(),
-      ...params,
-    });
+    await this.ensureAuth();
+    return this.request("/events.json", { ...this.schoolParam(), ...params });
   }
 
   async getUsers(): Promise<TCUser[]> {
+    await this.ensureAuth();
     return this.request("/users.json", this.schoolParam());
   }
 
   async getActivity(params: { date_start?: string; date_end?: string } = {}): Promise<TCActivity[]> {
-    return this.request("/activity.json", {
-      ...this.schoolParam(),
-      ...params,
-    });
+    await this.ensureAuth();
+    return this.request("/activity.json", { ...this.schoolParam(), ...params });
   }
 
   async getForms(): Promise<unknown[]> {
+    await this.ensureAuth();
     return this.request("/forms.json", this.schoolParam());
   }
 
   async getConferenceReports(childId: number): Promise<unknown[]> {
+    await this.ensureAuth();
     return this.request("/conference_reports.json", {
       ...this.schoolParam(),
       child_id: childId,

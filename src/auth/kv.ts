@@ -30,39 +30,56 @@ class MemoryStore {
 let redis: Redis | null = null;
 let memory: MemoryStore | null = null;
 
-function getStore(): Redis | MemoryStore {
-  if (process.env.REDIS_URL) {
-    if (!redis) {
-      redis = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 3 });
-      redis.on("error", (err: Error) => {
-        process.stderr.write(`Redis error (falling back to in-memory): ${err.message}\n`);
-        redis = null;
-      });
-    }
-    if (redis) return redis;
+function getRedis(): Redis | null {
+  if (!process.env.REDIS_URL) return null;
+  if (!redis) {
+    redis = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+      lazyConnect: false,
+    });
+    redis.on("error", (err: Error) => {
+      process.stderr.write(`[kv] Redis error (using in-memory fallback): ${err.message}\n`);
+      redis = null;
+    });
   }
+  return redis;
+}
+
+function getMemory(): MemoryStore {
   if (!memory) memory = new MemoryStore();
   return memory;
 }
 
 export async function storeAuthCode(code: string, data: AuthCode): Promise<void> {
-  const store = getStore();
+  const r = getRedis();
   const serialized = JSON.stringify(data);
-  if (store instanceof Redis) {
-    await store.setex(`auth:code:${code}`, AUTH_CODE_TTL, serialized);
-  } else {
-    store.set(`auth:code:${code}`, AUTH_CODE_TTL, serialized);
+  if (r) {
+    try {
+      await r.setex(`auth:code:${code}`, AUTH_CODE_TTL, serialized);
+      return;
+    } catch (err) {
+      process.stderr.write(`[kv] Redis setex failed, using in-memory: ${err}\n`);
+      redis = null;
+    }
   }
+  getMemory().set(`auth:code:${code}`, AUTH_CODE_TTL, serialized);
 }
 
 // Returns the code data and atomically deletes it — null if expired or already used.
 export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
-  const store = getStore();
-  let raw: string | null;
-  if (store instanceof Redis) {
-    raw = await store.getdel(`auth:code:${code}`);
+  const r = getRedis();
+  let raw: string | null = null;
+  if (r) {
+    try {
+      raw = await r.getdel(`auth:code:${code}`);
+    } catch (err) {
+      process.stderr.write(`[kv] Redis getdel failed, using in-memory: ${err}\n`);
+      redis = null;
+      raw = getMemory().getdel(`auth:code:${code}`);
+    }
   } else {
-    raw = store.getdel(`auth:code:${code}`);
+    raw = getMemory().getdel(`auth:code:${code}`);
   }
   if (!raw) return null;
   return JSON.parse(raw) as AuthCode;

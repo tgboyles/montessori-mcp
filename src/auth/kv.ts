@@ -60,6 +60,10 @@ function getMemory(): MemoryStore {
   return memory;
 }
 
+export async function probeRedis(): Promise<void> {
+  await getRedis();
+}
+
 export async function storeAuthCode(code: string, data: AuthCode): Promise<void> {
   const r = await getRedis();
   const serialized = JSON.stringify(data);

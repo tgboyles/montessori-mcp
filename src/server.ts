@@ -17,6 +17,7 @@ import {
   postAuthorize,
   postToken,
 } from "./auth/oauth.js";
+import { probeRedis } from "./auth/kv.js";
 import type { TcSession, FbSession } from "./auth/jwt.js";
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
@@ -134,6 +135,8 @@ export function startServer(): void {
   if (process.env.NODE_ENV === "development") {
     void devLogin();
   }
+
+  void probeRedis();
 
   mcpApp.listen(PORT, "0.0.0.0", () => {
     process.stderr.write(`Montessori MCP server listening on port ${PORT}\n`);

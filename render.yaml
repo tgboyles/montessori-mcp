@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: montessori-mcp
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: SERVER_URL
+        value: https://montessori-mcp.onrender.com
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: montessori-mcp-kv
+          property: connectionString
+
+  - type: keyvalue
+    name: montessori-mcp-kv
+    maxmemoryPolicy: noeviction
+    plan: free

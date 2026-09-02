@@ -78,7 +78,16 @@ export class FirebaseClient {
   private appId: string | null = null;
   private userCache: Map<string, string> = new Map();
 
-  async signIn(email: string, password: string): Promise<void> {
+  static fromToken(idToken: string, userId: string, appId: string | null): FirebaseClient {
+    const client = new FirebaseClient();
+    client.idToken = idToken;
+    client.userId = userId;
+    client.appId = appId;
+    return client;
+  }
+
+  // Returns the Firebase refreshToken, which is long-lived and can be stored.
+  async signIn(email: string, password: string): Promise<string> {
     const res = await fetch(`${FIREBASE_AUTH_URL}?key=${FIREBASE_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,6 +100,7 @@ export class FirebaseClient {
     const data = await res.json() as FirebaseUser;
     this.idToken = data.idToken;
     this.userId = data.localId;
+    return data.refreshToken;
   }
 
   setAppId(appId: string) {

@@ -87,7 +87,7 @@ describe("TCClient lazy authentication", () => {
     await tc.getChildren();
     await tc.getClassrooms();
 
-    const authCalls = mockFetch.mock.calls.filter(([url]: [string]) =>
+    const authCalls = mockFetch.mock.calls.filter(([url]: string[]) =>
       url.includes("authenticate")
     );
     expect(authCalls).toHaveLength(1);

@@ -77,7 +77,19 @@ export class TCClient {
     this.password = password;
   }
 
-  async authenticate(): Promise<{ id: number; first_name: string; last_name: string; roles: string[]; school_id: number }> {
+  static fromToken(apiToken: string, schoolId: number): TCClient {
+    const client = new TCClient("", "");
+    client.apiToken = apiToken;
+    client.schoolId = schoolId;
+    return client;
+  }
+
+  getApiToken(): string {
+    if (!this.apiToken) throw new Error("Not authenticated");
+    return this.apiToken;
+  }
+
+  async authenticate(): Promise<{ api_token: string; id: number; first_name: string; last_name: string; roles: string[]; school_id: number }> {
     const basicAuth = "Basic " + Buffer.from(`${this.email}:${this.password}`).toString("base64");
     const res = await fetch(`${TC_BASE}/authenticate.json`, {
       method: "GET",

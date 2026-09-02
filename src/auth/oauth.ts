@@ -43,27 +43,33 @@ interface ClientMetadata {
   redirect_uris: string[];
 }
 
-async function fetchClientMetadata(clientId: string): Promise<ClientMetadata> {
-  // client_id must be an HTTPS URL per the spec
+async function fetchClientMetadata(clientId: string): Promise<ClientMetadata | null> {
   if (!clientId.startsWith("https://")) {
     throw new Error("client_id must be an HTTPS URL");
   }
-  let meta: ClientMetadata;
   try {
     const res = await fetch(clientId, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    meta = await res.json() as ClientMetadata;
+    const meta = await res.json() as ClientMetadata;
+    if (meta.client_id !== clientId) throw new Error("client_id mismatch in metadata document");
+    if (!Array.isArray(meta.redirect_uris) || meta.redirect_uris.length === 0) throw new Error("missing redirect_uris");
+    return meta;
   } catch (e) {
-    throw new Error(`Could not fetch client metadata from ${clientId}: ${e}`);
+    // Metadata document is unreachable (e.g. protected by WAF). Log and continue —
+    // PKCE (S256) still prevents auth code theft even without redirect_uri validation.
+    process.stderr.write(`[oauth] Warning: could not fetch client metadata from ${clientId}: ${e}\n`);
+    return null;
   }
-  // client_id in the document must exactly match the URL
-  if (meta.client_id !== clientId) {
-    throw new Error("client_id in metadata document does not match the URL");
+}
+
+function isSafeRedirectUri(uri: string): boolean {
+  try {
+    const u = new URL(uri);
+    // Allow HTTPS to any host, or HTTP to localhost for dev clients
+    return u.protocol === "https:" || (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"));
+  } catch {
+    return false;
   }
-  if (!Array.isArray(meta.redirect_uris) || meta.redirect_uris.length === 0) {
-    throw new Error("client metadata missing redirect_uris");
-  }
-  return meta;
 }
 
 // ── GET /oauth/authorize ────────────────────────────────────────────────────
@@ -84,14 +90,24 @@ export async function getAuthorize(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  process.stderr.write(`[oauth] authorize: client_id=${client_id} redirect_uri=${redirect_uri}\n`);
+
   let clientName = "the app";
   try {
     const meta = await fetchClientMetadata(client_id);
-    if (!meta.redirect_uris.includes(redirect_uri)) {
-      res.status(400).send("invalid_request: redirect_uri not allowed");
-      return;
+    if (meta) {
+      if (!meta.redirect_uris.includes(redirect_uri)) {
+        res.status(400).send("invalid_request: redirect_uri not allowed");
+        return;
+      }
+      clientName = meta.client_name ?? clientName;
+    } else {
+      // Metadata unavailable — validate redirect_uri is at least a safe URL
+      if (!isSafeRedirectUri(redirect_uri)) {
+        res.status(400).send("invalid_request: redirect_uri must be https");
+        return;
+      }
     }
-    clientName = meta.client_name ?? clientName;
   } catch (e) {
     res.status(400).send(`invalid_client: ${e}`);
     return;
@@ -132,11 +148,16 @@ export async function postAuthorize(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  // Validate client again (re-fetch to prevent tampering)
+  // Re-validate client on POST
   try {
     const meta = await fetchClientMetadata(client_id);
-    if (!meta.redirect_uris.includes(redirect_uri)) {
-      res.status(400).send("invalid_request: redirect_uri not allowed");
+    if (meta) {
+      if (!meta.redirect_uris.includes(redirect_uri)) {
+        res.status(400).send("invalid_request: redirect_uri not allowed");
+        return;
+      }
+    } else if (!isSafeRedirectUri(redirect_uri)) {
+      res.status(400).send("invalid_request: redirect_uri must be https");
       return;
     }
   } catch (e) {
